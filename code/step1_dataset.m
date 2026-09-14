@@ -55,7 +55,6 @@ if numel(files) > 0
 
     %% STEP 5: Match image with its DR grade
 
-    % Get image filename
     imageName = string(files(1).name);
 
     % Remove .png
@@ -77,76 +76,77 @@ if numel(files) > 0
 
     end
 
-else
 
-    disp("No PNG images were found.");
+    %% STEP 6: Examine RGB channels
 
-end
-%% STEP 6: Examine RGB channels
+    figure;
 
-figure;
+    subplot(1,3,1);
+    imshow(img(:,:,1));
+    title("Red Channel");
 
-subplot(1,3,1);
-imshow(img(:,:,1));
-title("Red Channel");
+    subplot(1,3,2);
+    imshow(img(:,:,2));
+    title("Green Channel");
 
-subplot(1,3,2);
-imshow(img(:,:,2));
-title("Green Channel");
+    subplot(1,3,3);
+    imshow(img(:,:,3));
+    title("Blue Channel");
 
-subplot(1,3,3);
-imshow(img(:,:,3));
-title("Blue Channel");
-%% STEP 7: Green channel
 
-green = img(:,:,2);
+    %% STEP 7: Green channel
 
-figure;
-imshow(green);
-title("Green Channel");
-%% STEP 8: Crop the retinal field of view
+    green = img(:,:,2);
 
-% Convert RGB image to grayscale
-gray = rgb2gray(img);
+    figure;
+    imshow(green);
+    title("Green Channel");
 
-% Create a binary mask
-% Pixels brighter than 30 are considered part of the retinal region
-mask = gray > 30;
 
-% Remove small unwanted regions
-mask = bwareaopen(mask, 500);
+    %% STEP 8: CLAHE Enhancement
 
-% Fill holes inside the retinal region
-mask = imfill(mask, "holes");
+    % Convert green channel to double
+    green = im2double(green);
 
-% Find connected components
-stats = regionprops(mask, "BoundingBox", "Area");
+    % Apply CLAHE
+    enhancedGreen = adapthisteq(green, ...
+        "NumTiles", [8 8], ...
+        "ClipLimit", 0.01);
 
-% Make sure a region was detected
-if ~isempty(stats)
-
-    % Find the largest region
-    [~, largest] = max([stats.Area]);
-
-    % Get its bounding box
-    bbox = stats(largest).BoundingBox;
-
-    % Crop the original RGB image
-    croppedImg = imcrop(img, bbox);
-
-    % Display results
+    % Display comparison
     figure;
 
     subplot(1,2,1);
-    imshow(img);
-    title("Original Image");
+    imshow(green);
+    title("Original Green Channel");
 
     subplot(1,2,2);
-    imshow(croppedImg);
-    title("Cropped Retinal FOV");
-
-else
-
-    disp("No retinal region detected.");
+    imshow(enhancedGreen);
+    title("CLAHE Enhanced Green Channel");
 
 end
+%% STEP 9: Illumination Normalization
+
+% Estimate the smooth background illumination
+background = imgaussfilt(enhancedGreen, 30);
+
+% Remove uneven illumination
+normalizedGreen = enhancedGreen - background;
+
+% Rescale intensity for display
+normalizedGreen = mat2gray(normalizedGreen);
+
+% Display comparison
+figure;
+
+subplot(1,3,1);
+imshow(enhancedGreen);
+title("CLAHE Enhanced");
+
+subplot(1,3,2);
+imshow(background);
+title("Estimated Illumination");
+
+subplot(1,3,3);
+imshow(normalizedGreen);
+title("Illumination Normalized");
